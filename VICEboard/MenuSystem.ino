@@ -19,9 +19,9 @@ typedef enum
 
 typedef void (*menucallback_t)();
 typedef struct {
-  int                *value;
-  int                minimum;
-  int                maximum;
+  unsigned short     *value;
+  unsigned short     minimum;
+  unsigned short     maximum;
 } menuentry_value_t;
 
 
@@ -112,8 +112,6 @@ void show_config()
   Serial.println( systemconfig.ctrl_f5 );
   Serial.print( "CTRL + F7: " );
   Serial.println( systemconfig.ctrl_f7 );
-  Serial.println( "\nEEPROM data:" );
-  EEPROM_dump();
 }
 
 
@@ -182,7 +180,7 @@ menuentry_t menu_eeprom[] = {
 };
 
 menuentry_value_t   menu_led_max   = { &(systemconfig.led_max),   0x01, 0xff };
-menuentry_value_t   menu_led_delay = { &(systemconfig.led_delay), 0x01, 0xff };
+menuentry_value_t   menu_led_delay = { &(systemconfig.led_delay), 0x01, 0x63 };
 
 menuentry_t menu_leds[] = {
   MENUENTRY_TEXT(      "LEDs Menu" )
@@ -248,51 +246,19 @@ bool MenuSystem_getValue( char c, char base, void *rawentry )
   bool valid = false;
   menuentry_t *entry = (menuentry_t*)rawentry;
 
-  if ( !c )
+  if( !c )
   {
     input = entry->value->maximum;
-    for( maxdigits = 1; input /= base; ++maxdigits )
+    for( maxdigits = 0; input /= base; ++maxdigits )
     {
     }
     digits = 0;
     input = 0;
   }
 
-  if ( (c >= '0') && (c <= '9') )
+  if( (c == 0x08) || (c == 0x14) || (c == 0x7f) )
   {
-    input = input * base + (c - '0');
-    valid = true;
-  }
-
-  if ( base == 16 )
-  {
-    if ( (c >= 'A') && (c <= 'F') )
-    {
-      input = input * base + (c - 'A' + 10);
-      valid = true;
-    }
-    if ( (c >= 'a') && (c <= 'f') )
-    {
-      input = input * base + (c - 'a' + 10);
-      valid = true;
-    }
-  }
-
-  if ( input > entry->value->maximum )
-  {
-    input /= base;
-    valid = false;
-  }
-
-  if ( valid )
-  {
-    Serial.write( c );
-    ++digits;
-  }
-
-  if ( (c == 0x08) || (c == 0x14) || (c == 0x7f) )
-  {
-    if ( digits > 0 )
+    if( digits > 0 )
     {
       input = input / base;
       --digits;
@@ -300,11 +266,11 @@ bool MenuSystem_getValue( char c, char base, void *rawentry )
     }
   }
 
-  if ( (c == 0x0a) || (c == 0x0d) )
+  if( (c == 0x0a) || (c == 0x0d) )
   {
-    if ( digits > 0 )
+    if( digits > 0 )
     {
-      if ( (input >= entry->value->minimum) && (input <= entry->value->maximum) )
+      if( (input >= entry->value->minimum) && (input <= entry->value->maximum) )
       {
         *(entry->value->value) = input;
       }
@@ -317,6 +283,43 @@ bool MenuSystem_getValue( char c, char base, void *rawentry )
     return true;
   }
 
+  if( digits > maxdigits )
+  {
+    return false;
+  }
+
+  if( (c >= '0') && (c <= '9') )
+  {
+    input = input * base + (c - '0');
+    valid = true;
+  }
+
+  if( base == 16 )
+  {
+    if( (c >= 'A') && (c <= 'F') )
+    {
+      input = input * base + (c - 'A' + 10);
+      valid = true;
+    }
+    if( (c >= 'a') && (c <= 'f') )
+    {
+      input = input * base + (c - 'a' + 10);
+      valid = true;
+    }
+  }
+
+  if( input > entry->value->maximum )
+  {
+    input /= base;
+    valid = false;
+  }
+
+  if( valid )
+  {
+    Serial.write( c );
+    ++digits;
+  }
+
   return false;
 }
 
@@ -326,15 +329,15 @@ void MenuSystem_print()
   int m, i;
   menuentry_t *entry;
 
-  if ( menuprinted )
+  if( menuprinted )
   {
     return;
   }
   menuprinted = true;
-  Serial.print( "\n" );
+  Serial.println( F("") );
   for ( m = 0; m < MENUSTACKSIZE; ++m )
   {
-    if ( menustack[m].follow )
+    if( menustack[m].follow )
     {
       switch ( menustack[m].follow->type )
       {
@@ -369,31 +372,31 @@ void MenuSystem_print()
           case END:
             return;
           case TEXT:
-            printf( "    %s\n", entry->text );
+            Serial.printf( "    %s\r\n", entry->text );
             break;
           case MENU:
           case FUNC:
-            printf( "[%c] %s\n", entry->letter, entry->text );
+            Serial.printf( "[%c] %s\r\n", entry->letter, entry->text );
             break;
           case BOOL:
-            printf( "[%c] %s [%s]\n", entry->letter, entry->text, *(entry->toggle) ? "on" : "off" );
+            Serial.printf( "[%c] %s [%s]\r\n", entry->letter, entry->text, *(entry->toggle) ? "on" : "off" );
             break;
           case DECI:
-            printf( "[%c] %s [%d]\n", entry->letter, entry->text, *(entry->value->value) );
+            Serial.printf( "[%c] %s [%d]\r\n", entry->letter, entry->text, *(entry->value->value) );
             break;
           case HEX2:
-            printf( "[%c] %s [$%02X]\n", entry->letter, entry->text, *(entry->value->value) );
+            Serial.printf( "[%c] %s [$%02X]\r\n", entry->letter, entry->text, *(entry->value->value) );
             break;
           case HEX4:
-            printf( "[%c] %s [$%04X]\n", entry->letter, entry->text, *(entry->value->value) );
+            Serial.printf( "[%c] %s [$%04X]\r\n", entry->letter, entry->text, *(entry->value->value) );
             break;
           default:
             break;
         }
       }
-      if ( m > 0 )
+      if( m > 0 )
       {
-        printf( "[X] Go back\n" );
+        Serial.println( F("[X] Go back") );
       }
       return;
     }
@@ -407,22 +410,22 @@ void MenuSystem_eval( char c )
   menuentry_t *entry;
 
   c = toupper(c);
-  if ( c == 0 )
+  if( c == 0 )
   {
-    printf( "PROBLEM: no way to handle NULL byte input\n" );
+    Serial.printf( "PROBLEM: no way to handle NULL byte input\n" );
     return;
   }
   for ( m = 0; m < MENUSTACKSIZE; ++m )
   {
 
-    if ( menustack[m].follow )
+    if( menustack[m].follow )
     {
       switch ( menustack[m].follow->type )
       {
         case MENU:
           break;
         case DECI:
-          if ( MenuSystem_getValue( c, 10, menustack[m].follow ) )
+          if( MenuSystem_getValue( c, 10, menustack[m].follow ) )
           {
             menustack[m].follow = 0;
             menuprinted = false;
@@ -430,7 +433,7 @@ void MenuSystem_eval( char c )
           return;
         case HEX2:
         case HEX4:
-          if ( MenuSystem_getValue( c, 16, menustack[m].follow ) )
+          if( MenuSystem_getValue( c, 16, menustack[m].follow ) )
           {
             menustack[m].follow = 0;
             menuprinted = false;
@@ -466,7 +469,7 @@ void MenuSystem_eval( char c )
       switch( entry->type )
       {
         case MENU:
-          if ( m < MENUSTACKSIZE - 1 )
+          if( m < MENUSTACKSIZE - 1 )
           {
             menustack[m].follow = entry;
             menustack[m + 1].follow = 0;

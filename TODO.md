@@ -16,4 +16,6 @@ TODO
   - ESP.getSketchMD5()
   - ESP.getFreeSketchSpace()
   - ESP.magicFlashChipSize()
+- when the reset button is exported as an additional key (at the side),
+  a full power off option would be useful
 

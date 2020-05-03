@@ -16,24 +16,24 @@ struct header_s
 };
 struct gpioconfig_s
 {
-  unsigned char   dc00[8];
-  unsigned char   dc01[8];
-  unsigned char   leds[2];
-  unsigned char   restore;
-  unsigned char   extra;
+  unsigned short  dc00[8];
+  unsigned short  dc01[8];
+  unsigned short  leds[2];
+  unsigned short  restore;
+  unsigned short  extra;
 } gpios;
 struct config_s
 {
-  int             cpu_freq;
-  int             timer_bt;
-  int             timer_nobt;
-  int             led_delay;
-  int             led_max;
+  unsigned short  cpu_freq;
+  unsigned short  timer_bt;
+  unsigned short  timer_nobt;
+  unsigned short  led_delay;
+  unsigned short  led_max;
   bool            combokeys;
-  int             ctrl_f1;
-  int             ctrl_f3;
-  int             ctrl_f5;
-  int             ctrl_f7;
+  unsigned short  ctrl_f1;
+  unsigned short  ctrl_f3;
+  unsigned short  ctrl_f5;
+  unsigned short  ctrl_f7;
 } systemconfig;
 
 #define DATA_VERSION 1
@@ -129,7 +129,7 @@ void EEPROM_setup()
   systemconfig.cpu_freq   = 80;
   systemconfig.timer_bt   = 300;
   systemconfig.timer_nobt = 60;
-  systemconfig.led_delay  = 100;
+  systemconfig.led_delay  = 50;
   systemconfig.led_max    = 80;
   systemconfig.combokeys  = true;
   systemconfig.ctrl_f1    = KEY_F9;

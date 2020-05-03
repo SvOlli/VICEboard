@@ -61,7 +61,8 @@ void LED_change()
 
 void LED_loop()
 {
-  static unsigned short counter = 0;
+  static unsigned long counter = 0;
+
   int i;
   for( i = 0; i < 2; ++i )
   {
@@ -70,12 +71,12 @@ void LED_loop()
       LED_states[i].target = LED_states[i].next;
     }
   }
-  if( ++counter < systemconfig.led_delay )
+  if( millis() < counter )
   {
     return;
   }
 
-  counter = 0;
+  counter = millis() + systemconfig.led_delay;
   for( i = 0; i < 2; ++i )
   {
     if( LED_states[i].current < LED_states[i].target )
