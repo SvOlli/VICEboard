@@ -12,7 +12,18 @@ optional key combinations mapping to special keys, like "CTRL + F7" will send
 
 Required:
 ---------
+- ESP32 board with at least 19 OUTPUT capable GPIOs available
 - [ESP32 support in Arduino](https://github.com/espressif/arduino-esp32)
 - [ESP32-BLE-Keyboard library](https://github.com/T-vK/ESP32-BLE-Keyboard)
-- [Library for the menusystem]()
+
+Building:
+---------
+For building your own, you can wire it up as you like, just make sure that:
+- For Restore use one of these GPIOs, or no waking up:
+  0, 2, 4, 12, 14, 15, 25, 26, 27, 32, 33
+
+For the rest there is a tool call GPIO_Tester that will generate a bit of
+source code for you, after you've gone through all of the pins as instructed.
+Replace this part at the top of VICEboard.ino, and you configuration should
+work.
 

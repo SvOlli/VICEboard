@@ -50,6 +50,15 @@ void LED_set( int id, int value )
 }
 
 
+void LED_change()
+{
+  for( int i = 0; i < 2; ++i )
+  {
+    LED_states[i].target = 100 - LED_states[i].next;
+  }
+}
+
+
 void LED_loop()
 {
   static unsigned short counter = 0;
