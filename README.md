@@ -9,6 +9,8 @@ It is recommended to use it with the SDL version, since the VICEboard offers
 optional key combinations mapping to special keys, like "CTRL + F7" will send
 "F12" to access the configuration menu.
 
+![](pictures/VICEboard_full.jpg)
+
 
 Required:
 ---------
@@ -26,4 +28,19 @@ For the rest there is a tool call GPIO_Tester that will generate a bit of
 source code for you, after you've gone through all of the pins as instructed.
 Replace this part at the top of VICEboard.ino, and you configuration should
 work.
+
+Pictures:
+---------
+
+Disconnected:\
+![](pictures/VICEboard_full.jpg)
+
+Connecting turns the LED to green:\
+![](pictures/VICEboard_connected.jpg)
+
+Open:\
+![](pictures/VICEboard_open.jpg)
+
+Controller:\
+![](pictures/VICEboard_controller.jpg)
 

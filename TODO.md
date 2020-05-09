@@ -18,4 +18,6 @@ TODO
   - ESP.magicFlashChipSize()
 - when the reset button is exported as an additional key (at the side),
   a full power off option would be useful
+  - configuration option to decide between deep sleep and power off
+- check for wireless USB keyboard option
 
