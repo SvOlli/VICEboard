@@ -1,7 +1,7 @@
 
 /*
- * LEDs
- * ====
+ * LEDs.ino
+ * ========
  * 
  * will not switch color immediately, but fade to desired brightness
  * maximum brightness will also be limited
@@ -76,18 +76,18 @@ void LED_loop()
     return;
   }
 
-  counter = millis() + systemconfig.led_delay;
+  counter = millis() + sysconfig.led_delay;
   for( i = 0; i < 2; ++i )
   {
     if( LED_states[i].current < LED_states[i].target )
     {
       ++(LED_states[i].current);
-      ledcWrite( i, (unsigned short)LED_states[i].current * systemconfig.led_max / 100 );
+      ledcWrite( i, (uint16_t)LED_states[i].current * sysconfig.led_max / 100 );
     }
     if( LED_states[i].current > LED_states[i].target )
     {
       --(LED_states[i].current);
-      ledcWrite( i, (unsigned short)LED_states[i].current * systemconfig.led_max / 100 );
+      ledcWrite( i, (uint16_t)LED_states[i].current * sysconfig.led_max / 100 );
     }
   }
 }

@@ -1,9 +1,12 @@
 
 /*
+ * MenuSystem.ino
+ * ==============
+ *
+ * TODO:
+ * - map all data
+ */
 
-   TODO:
-   - map all data
-*/
 
 typedef enum
 {
@@ -12,17 +15,31 @@ typedef enum
   MENU,
   FUNC,
   BOOL,
-  DECI,
+  DEC1,
+  DEC2,
+  DEC4,
+  HEX1,
   HEX2,
   HEX4
 } menuentrytype_t;
 
+
 typedef void (*menucallback_t)();
 typedef struct {
-  unsigned short     *value;
-  unsigned short     minimum;
-  unsigned short     maximum;
-} menuentry_value_t;
+  uint8_t      *value;
+  uint8_t      minimum;
+  uint8_t      maximum;
+} menuentry_uint8_t;
+typedef struct {
+  uint16_t     *value;
+  uint16_t     minimum;
+  uint16_t     maximum;
+} menuentry_uint16_t;
+typedef struct {
+  uint32_t     *value;
+  uint32_t     minimum;
+  uint32_t     maximum;
+} menuentry_uint32_t;
 
 
 typedef struct menuentry_s menuentry_t;
@@ -31,11 +48,13 @@ typedef struct menuentry_s {
   char                    letter;
   const char              *text;
   union {
-    void                 *handle;
-    menuentry_t          *submenu;
-    void                 (*callback)();
-    bool                 *toggle;
-    menuentry_value_t    *value;
+    void                  *handle;
+    menuentry_t           *submenu;
+    void                  (*callback)();
+    bool                  *toggle;
+    menuentry_uint8_t     *value8;
+    menuentry_uint16_t    *value16;
+    menuentry_uint32_t    *value32;
   };
 };
 
@@ -52,18 +71,24 @@ menustack_t menustack[MENUSTACKSIZE];
 
 #define MENUENTRY_TEXT( b )         { TEXT, 0, b, 0 },
 #define MENUENTRY_MENU( a, b, c )   { MENU, a, b, c },
-#define MENUENTRY_FUNC( a, b, c )   { FUNC, a, b, (void*)c }, /* broken :( */
+#define MENUENTRY_FUNC( a, b, c )   { FUNC, a, b, (void*)c },
 #define MENUENTRY_BOOL( a, b, c )   { BOOL, a, b, &(c) },
-#define MENUENTRY_DECI( a, b, c )   { DECI, a, b, &(c) },
+#define MENUENTRY_DEC1( a, b, c )   { DEC1, a, b, &(c) },
+#define MENUENTRY_DEC2( a, b, c )   { DEC2, a, b, &(c) },
+#define MENUENTRY_DEC4( a, b, c )   { DEC4, a, b, &(c) },
+#define MENUENTRY_HEX1( a, b, c )   { HEX1, a, b, &(c) },
 #define MENUENTRY_HEX2( a, b, c )   { HEX2, a, b, &(c) },
 #define MENUENTRY_HEX4( a, b, c )   { HEX4, a, b, &(c) },
-#define MENUENTRY_END               { END, 0, 0, 0 }
+#define MENUENTRY_END               { END,  0, 0, 0 }
 
 
 
 void show_config()
 {
   int i;
+  const uint8_t *Keymap = sysconfig.use_custom_keymap ?
+                                sysconfig.custom_keymap :
+                                Keymap_VICE_positional;
   Serial.println( "Configuration" );
   Serial.println( "=============" );
 
@@ -92,26 +117,33 @@ void show_config()
   Serial.print( LED_gpios[1] );
   Serial.println( F(".") );
 
-  Serial.print( "CPU freqency: " );
-  Serial.println( systemconfig.cpu_freq );
-  Serial.print( "Timeout (bluetooth): " );
-  Serial.println( systemconfig.timer_bt );
-  Serial.print( "Timeout (no bluetooth): " );
-  Serial.println( systemconfig.timer_nobt );
-  Serial.print( "LED delay: " );
-  Serial.println( systemconfig.led_delay );
-  Serial.print( "LED brightness: " );
-  Serial.println( systemconfig.led_max );
-  Serial.print( "Combokeys: " );
-  Serial.println( systemconfig.combokeys );
-  Serial.print( "CTRL + F1: " );
-  Serial.println( systemconfig.ctrl_f1 );
-  Serial.print( "CTRL + F3: " );
-  Serial.println( systemconfig.ctrl_f3 );
-  Serial.print( "CTRL + F5: " );
-  Serial.println( systemconfig.ctrl_f5 );
-  Serial.print( "CTRL + F7: " );
-  Serial.println( systemconfig.ctrl_f7 );
+  Serial.print( F("CPU freqency: ") );
+  Serial.println( sysconfig.cpu_freq );
+  Serial.print( F("Timeout (bluetooth): ") );
+  Serial.println( sysconfig.timer_bt );
+  Serial.print( F("Timeout (no bluetooth): ") );
+  Serial.println( sysconfig.timer_nobt );
+  Serial.print( F("LED delay: ") );
+  Serial.println( sysconfig.led_delay );
+  Serial.print( F("LED brightness: ") );
+  Serial.println( sysconfig.led_max );
+  Serial.print( F("Combokeys: ") );
+  Serial.println( sysconfig.use_combokeys );
+  Serial.print( F("CTRL + F1: ") );
+  Serial.printf( "$%02X\r\n", sysconfig.ctrl_f1 );
+  Serial.print( F("CTRL + F3: ") );
+  Serial.printf( "$%02X\r\n", sysconfig.ctrl_f3 );
+  Serial.print( F("CTRL + F5: ") );
+  Serial.printf( "$%02X\r\n", sysconfig.ctrl_f5 );
+  Serial.print( F("CTRL + F7: ") );
+  Serial.printf( "$%02X\r\n", sysconfig.ctrl_f7 );
+  Serial.print( F("Custom keymap: ") );
+  Serial.println( sysconfig.use_custom_keymap );
+  for( i = 0; i < 65; ++i )
+  {
+    Serial.printf( "$%02X%s", Keymap[i], (i % 8) == 7 ? F("\r\n") : F(" ") );
+  }
+  Serial.println( F(".") );
 }
 
 
@@ -169,6 +201,90 @@ void show_keycodes()
 }
 
 
+void check_keymap()
+{
+  int fails = 0;
+  for( int i = 0; i < sizeof(sysconfig.custom_keymap); ++i )
+  {
+    if( sysconfig.custom_keymap[i] == 0 )
+    {
+      ++fails;
+    }
+  }
+  if( fails > 0 )
+  {
+    Serial.print( F("Keymap invalid, number of $00 value(s) found:") );
+    Serial.println( fails );
+    sysconfig.use_custom_keymap = false;
+  }
+  else
+  {
+    Serial.println( F("Keymap valid") );
+  }
+}
+
+
+void set_bluetooth_pin()
+{
+  Serial.println( F("This pin is used when pairing") );
+}
+
+
+void enter_keymap()
+{
+  int count = 0;
+  bool valid = true;
+  uint8_t input = 0;
+
+  Serial.println( F("Keyboard configuration must be entered as single line,") );
+  Serial.println( F("consisting 65 2-digit hex values, followed by a newline.") );
+  Serial.println( F("So it's 130 characters in total, not counting the newline.") );
+  Serial.println( F("Using copy'n'paste is strongly recommended.") );
+
+  while( valid && (count < 130) )
+  {
+    if( Serial.available() )
+    {
+      char c = toupper( Serial.read() );
+      valid = false;
+
+      if( (c >= '0') && (c <= '9') )
+      {
+        input = input * 16 + (c - '0');
+        valid = true;
+      }
+      if( (c >= 'A') && (c <= 'F') )
+      {
+        input = input * 16 + (c - 'A' + 10);
+        valid = true;
+      }
+      if( valid && (count++ & 1) )
+      {
+        sysconfig.custom_keymap[count/2] = input;
+        input = 0;
+        Serial.write( c );
+        if( !(count & 0x0f) )
+        {
+          Serial.println( F("") );
+        }
+        else
+        {
+          Serial.print( F(" ") );
+        }
+      }
+      else
+      {
+        Serial.write( c );
+      }
+    }
+  }
+
+  Serial.println( F("") );
+  Serial.println( valid ? F("Successful set keyboard configuration") 
+                        : F("Setting keyboard configuration failed!") );
+}
+
+
 menuentry_t menu_eeprom[] = {
   MENUENTRY_TEXT(      "EEPROM Menu" )
   MENUENTRY_TEXT(      "===========" )
@@ -179,78 +295,85 @@ menuentry_t menu_eeprom[] = {
   MENUENTRY_END
 };
 
-menuentry_value_t   menu_led_max   = { &(systemconfig.led_max),   0x01, 0xff };
-menuentry_value_t   menu_led_delay = { &(systemconfig.led_delay), 0x01, 0x63 };
+menuentry_uint16_t   menu_led_max   = { &(sysconfig.led_max),   0x01, 0xff };
+menuentry_uint16_t   menu_led_delay = { &(sysconfig.led_delay), 0x01, 0x63 };
 
 menuentry_t menu_leds[] = {
   MENUENTRY_TEXT(      "LEDs Menu" )
   MENUENTRY_TEXT(      "=========" )
-  MENUENTRY_DECI( 'M', "Maximum brightness", menu_led_max )
-  MENUENTRY_DECI( 'D', "Delay for color change", menu_led_delay )
+  MENUENTRY_DEC2( 'M', "Maximum brightness", menu_led_max )
+  MENUENTRY_DEC2( 'D', "Delay for color change", menu_led_delay )
   MENUENTRY_FUNC( 'S', "Show settings on LEDs", LED_change )
   MENUENTRY_END
 };
 
-menuentry_value_t   menu_key_ctrl_f1 = { &(systemconfig.ctrl_f1), 0x20, 0xff };
-menuentry_value_t   menu_key_ctrl_f3 = { &(systemconfig.ctrl_f3), 0x20, 0xff };
-menuentry_value_t   menu_key_ctrl_f5 = { &(systemconfig.ctrl_f5), 0x20, 0xff };
-menuentry_value_t   menu_key_ctrl_f7 = { &(systemconfig.ctrl_f7), 0x20, 0xff };
+menuentry_uint16_t   menu_key_ctrl_f1        = { &(sysconfig.ctrl_f1), 0x20, 0xff };
+menuentry_uint16_t   menu_key_ctrl_f3        = { &(sysconfig.ctrl_f3), 0x20, 0xff };
+menuentry_uint16_t   menu_key_ctrl_f5        = { &(sysconfig.ctrl_f5), 0x20, 0xff };
+menuentry_uint16_t   menu_key_ctrl_f7        = { &(sysconfig.ctrl_f7), 0x20, 0xff };
+menuentry_uint16_t   menu_debounce_threshold = { &(sysconfig.debounce_threshold), 1, 19 };
 
 menuentry_t menu_keys[] = {
   MENUENTRY_TEXT(      "Keys Menu" )
   MENUENTRY_TEXT(      "=========" )
-  MENUENTRY_BOOL( 'C', "Combo keys", systemconfig.combokeys )
-  MENUENTRY_HEX2( '1', "Ctrl + F1", menu_key_ctrl_f1 )
-  MENUENTRY_HEX2( '3', "Ctrl + F3", menu_key_ctrl_f3 )
-  MENUENTRY_HEX2( '5', "Ctrl + F5", menu_key_ctrl_f5 )
-  MENUENTRY_HEX2( '7', "Ctrl + F7", menu_key_ctrl_f7 )
+  MENUENTRY_DEC2( 'T', "Debounce threshold", menu_debounce_threshold )
   MENUENTRY_FUNC( 'S', "Show keycodes", show_keycodes )
+  MENUENTRY_BOOL( 'C', "Combo keys", sysconfig.use_combokeys )
+  MENUENTRY_HEX1( '1', "Ctrl + F1", menu_key_ctrl_f1 )
+  MENUENTRY_HEX1( '3', "Ctrl + F3", menu_key_ctrl_f3 )
+  MENUENTRY_HEX1( '5', "Ctrl + F5", menu_key_ctrl_f5 )
+  MENUENTRY_HEX1( '7', "Ctrl + F7", menu_key_ctrl_f7 )
+  MENUENTRY_BOOL( 'M', "Use custom keymap", sysconfig.use_custom_keymap )
+  MENUENTRY_FUNC( 'V', "Verify custom keymap", check_keymap )
+  MENUENTRY_FUNC( 'E', "Enter custom keymap codes", enter_keymap )
   MENUENTRY_END
 };
 
-menuentry_value_t   menu_power_freq         = { &(systemconfig.led_delay),  80, 240 };
-menuentry_value_t   menu_power_connected    = { &(systemconfig.timer_bt),   10, 3600 };
-menuentry_value_t   menu_power_disconnected = { &(systemconfig.timer_nobt), 10, 3600 };
+menuentry_uint16_t   menu_power_freq         = { &(sysconfig.led_delay),  80, 240 };
+menuentry_uint16_t   menu_power_connected    = { &(sysconfig.timer_bt),   10, 3600 };
+menuentry_uint16_t   menu_power_disconnected = { &(sysconfig.timer_nobt), 10, 3600 };
 
 menuentry_t menu_power[] = {
   MENUENTRY_TEXT(      "Power Menu" )
   MENUENTRY_TEXT(      "==========" )
-  MENUENTRY_DECI( 'F', "Set CPU frequency", menu_power_freq )
-  MENUENTRY_DECI( 'C', "Set standbytime when connected", menu_power_connected )
-  MENUENTRY_DECI( 'D', "Set standbytime when disconnected", menu_power_disconnected )
+  MENUENTRY_DEC2( 'F', "Set CPU frequency", menu_power_freq )
+  MENUENTRY_DEC2( 'C', "Set standbytime when connected", menu_power_connected )
+  MENUENTRY_DEC2( 'D', "Set standbytime when disconnected", menu_power_disconnected )
   MENUENTRY_FUNC( 'R', "Reboot", esp_restart )
   MENUENTRY_FUNC( 'Z', "Sleep now", Power_off )
   MENUENTRY_END
 };
 
+menuentry_uint32_t   menu_bluetooth_pin = { &(sysconfig.bluetooth_pin), 0, 0xFFFFFFFF };
+
 menuentry_t menu_main[] = {
   MENUENTRY_TEXT(      "VICEboard Main Menu" )
   MENUENTRY_TEXT(      "===================" )
   MENUENTRY_FUNC( 'S', "Show full configuration", show_config )
+  MENUENTRY_DEC4( 'B', "Set Bluetooth PIN (0=off)", menu_bluetooth_pin )
   MENUENTRY_MENU( 'L', "Configure LEDs", menu_leds )
-  MENUENTRY_MENU( 'K', "Configure key combos", menu_keys )
+  MENUENTRY_MENU( 'K', "Configure keyboard", menu_keys )
   MENUENTRY_MENU( 'P', "Power configuration", menu_power )
   MENUENTRY_MENU( 'E', "EEPROM functions", menu_eeprom )
   MENUENTRY_END
 };
 
 
-
-/* f'ing arduino reorders source code */
-bool MenuSystem_getValue( char c, char base, void *rawentry )
+bool MenuSystem_getValue( char c, char base, uint32_t minimum, uint32_t maximum, uint32_t *value )
 {
   /* c = 0: prepare, else handle input */
   static int maxdigits = 0;
   static int digits = 0;
-  static int input = 0;
+  static uint32_t input = 0;
   bool valid = false;
-  menuentry_t *entry = (menuentry_t*)rawentry;
 
   if( !c )
   {
-    input = entry->value->maximum;
+    /* c = 0: reset input */
+    input = maximum;
     for( maxdigits = 0; input /= base; ++maxdigits )
     {
+      /* counting maxdigits */
     }
     digits = 0;
     input = 0;
@@ -270,9 +393,9 @@ bool MenuSystem_getValue( char c, char base, void *rawentry )
   {
     if( digits > 0 )
     {
-      if( (input >= entry->value->minimum) && (input <= entry->value->maximum) )
+      if( (input >= minimum) && (input <= maximum) )
       {
-        *(entry->value->value) = input;
+        *value = input;
       }
       else
       {
@@ -308,7 +431,7 @@ bool MenuSystem_getValue( char c, char base, void *rawentry )
     }
   }
 
-  if( input > entry->value->maximum )
+  if( input > maximum )
   {
     input /= base;
     valid = false;
@@ -321,6 +444,54 @@ bool MenuSystem_getValue( char c, char base, void *rawentry )
   }
 
   return false;
+}
+
+
+bool MenuSystem_getUInt8( char c, char base, void *rawentry )
+{
+  bool retval;
+  menuentry_t *entry = (menuentry_t*)rawentry;
+  uint32_t input = *(entry->value8->value);
+
+  retval = MenuSystem_getValue( c, base, entry->value8->minimum, entry->value8->maximum, &input );
+
+  if( retval )
+  {
+    *(entry->value8->value) = input & 0xFF;
+  }
+  return retval;
+}
+
+
+bool MenuSystem_getUInt16( char c, char base, void *rawentry )
+{
+  bool retval;
+  menuentry_t *entry = (menuentry_t*)rawentry;
+  uint32_t input = *(entry->value16->value);
+
+  retval = MenuSystem_getValue( c, base, entry->value16->minimum, entry->value16->maximum, &input );
+
+  if( retval )
+  {
+    *(entry->value16->value) = input & 0xFFFF;
+  }
+  return retval;
+}
+
+
+bool MenuSystem_getUInt32( char c, char base, void *rawentry )
+{
+  bool retval;
+  menuentry_t *entry = (menuentry_t*)rawentry;
+  uint32_t input = *(entry->value32->value);
+
+  retval = MenuSystem_getValue( c, base, entry->value32->minimum, entry->value32->maximum, &input );
+
+  if( retval )
+  {
+    *(entry->value32->value) = input;
+  }
+  return retval;
 }
 
 
@@ -341,23 +512,41 @@ void MenuSystem_print()
     {
       switch ( menustack[m].follow->type )
       {
-        case DECI:
-          Serial.printf( "%s\r\n(%d-%d) [%d]\r\n", menustack[m].follow->text,
-                         menustack[m].follow->value->minimum,
-                         menustack[m].follow->value->maximum,
-                         *(menustack[m].follow->value->value) );
+        case DEC1:
+          Serial.printf( "%s\r\n(%u-%u) [%u]\r\n", menustack[m].follow->text,
+                         menustack[m].follow->value8->minimum,
+                         menustack[m].follow->value8->maximum,
+                         *(menustack[m].follow->value8->value) );
+          return;
+        case DEC2:
+          Serial.printf( "%s\r\n(%u-%u) [%u]\r\n", menustack[m].follow->text,
+                         menustack[m].follow->value16->minimum,
+                         menustack[m].follow->value16->maximum,
+                         *(menustack[m].follow->value16->value) );
+          return;
+        case DEC4:
+          Serial.printf( "%s\r\n(%u-%u) [%u]\r\n", menustack[m].follow->text,
+                         menustack[m].follow->value32->minimum,
+                         menustack[m].follow->value32->maximum,
+                         *(menustack[m].follow->value32->value) );
+          return;
+        case HEX1:
+          Serial.printf( "%s\r\n($%02X-$%02X) [$%02X]\r\n", menustack[m].follow->text,
+                         menustack[m].follow->value8->minimum,
+                         menustack[m].follow->value8->maximum,
+                         *(menustack[m].follow->value8->value) );
           return;
         case HEX2:
-          Serial.printf( "%s\r\n($%02X-$%02X) [$%02X]\r\n", menustack[m].follow->text,
-                         menustack[m].follow->value->minimum,
-                         menustack[m].follow->value->maximum,
-                         *(menustack[m].follow->value->value) );
+          Serial.printf( "%s\r\n($%04X-$%04X) [$%04X]\r\n", menustack[m].follow->text,
+                         menustack[m].follow->value16->minimum,
+                         menustack[m].follow->value16->maximum,
+                         *(menustack[m].follow->value16->value) );
           return;
         case HEX4:
-          Serial.printf( "%s\r\n($%04X-$%04X) [$%04X]\r\n", menustack[m].follow->text,
-                         menustack[m].follow->value->minimum,
-                         menustack[m].follow->value->maximum,
-                         *(menustack[m].follow->value->value) );
+          Serial.printf( "%s\r\n($%08X-$%08X) [$%08X]\r\n", menustack[m].follow->text,
+                         menustack[m].follow->value32->minimum,
+                         menustack[m].follow->value32->maximum,
+                         *(menustack[m].follow->value32->value) );
           return;
         default:
           break;
@@ -381,14 +570,23 @@ void MenuSystem_print()
           case BOOL:
             Serial.printf( "[%c] %s [%s]\r\n", entry->letter, entry->text, *(entry->toggle) ? "on" : "off" );
             break;
-          case DECI:
-            Serial.printf( "[%c] %s [%d]\r\n", entry->letter, entry->text, *(entry->value->value) );
+          case DEC1:
+            Serial.printf( "[%c] %s [%u]\r\n", entry->letter, entry->text, *(entry->value8->value) );
+            break;
+          case DEC2:
+            Serial.printf( "[%c] %s [%u]\r\n", entry->letter, entry->text, *(entry->value16->value) );
+            break;
+          case DEC4:
+            Serial.printf( "[%c] %s [%u]\r\n", entry->letter, entry->text, *(entry->value32->value) );
+            break;
+          case HEX1:
+            Serial.printf( "[%c] %s [$%02X]\r\n", entry->letter, entry->text, *(entry->value8->value) );
             break;
           case HEX2:
-            Serial.printf( "[%c] %s [$%02X]\r\n", entry->letter, entry->text, *(entry->value->value) );
+            Serial.printf( "[%c] %s [$%04X]\r\n", entry->letter, entry->text, *(entry->value16->value) );
             break;
           case HEX4:
-            Serial.printf( "[%c] %s [$%04X]\r\n", entry->letter, entry->text, *(entry->value->value) );
+            Serial.printf( "[%c] %s [$%08X]\r\n", entry->letter, entry->text, *(entry->value32->value) );
             break;
           default:
             break;
@@ -398,6 +596,7 @@ void MenuSystem_print()
       {
         Serial.println( F("[X] Go back") );
       }
+      Serial.println( F("READY.") );
       return;
     }
   }
@@ -424,16 +623,43 @@ void MenuSystem_eval( char c )
       {
         case MENU:
           break;
-        case DECI:
-          if( MenuSystem_getValue( c, 10, menustack[m].follow ) )
+        case DEC1:
+          if( MenuSystem_getUInt8( c, 10, menustack[m].follow ) )
+          {
+            menustack[m].follow = 0;
+            menuprinted = false;
+          }
+          return;
+        case DEC2:
+          if( MenuSystem_getUInt16( c, 10, menustack[m].follow ) )
+          {
+            menustack[m].follow = 0;
+            menuprinted = false;
+          }
+          return;
+        case DEC4:
+          if( MenuSystem_getUInt32( c, 10, menustack[m].follow ) )
+          {
+            menustack[m].follow = 0;
+            menuprinted = false;
+          }
+          return;
+        case HEX1:
+          if( MenuSystem_getUInt8( c, 16, menustack[m].follow ) )
           {
             menustack[m].follow = 0;
             menuprinted = false;
           }
           return;
         case HEX2:
+          if( MenuSystem_getUInt16( c, 16, menustack[m].follow ) )
+          {
+            menustack[m].follow = 0;
+            menuprinted = false;
+          }
+          return;
         case HEX4:
-          if( MenuSystem_getValue( c, 16, menustack[m].follow ) )
+          if( MenuSystem_getUInt32( c, 16, menustack[m].follow ) )
           {
             menustack[m].follow = 0;
             menuprinted = false;
@@ -486,15 +712,34 @@ void MenuSystem_eval( char c )
           menuprinted = false;
           return;
           break;
-        case DECI:
+        case DEC1:
           menustack[m].follow = entry;
-          MenuSystem_getValue( 0, 10, entry );
+          MenuSystem_getUInt8( 0, 10, entry );
+          menuprinted = false;
+          break;
+        case DEC2:
+          menustack[m].follow = entry;
+          MenuSystem_getUInt16( 0, 10, entry );
+          menuprinted = false;
+          break;
+        case DEC4:
+          menustack[m].follow = entry;
+          MenuSystem_getUInt32( 0, 10, entry );
+          menuprinted = false;
+          break;
+        case HEX1:
+          menustack[m].follow = entry;
+          MenuSystem_getUInt8( 0, 16, entry );
           menuprinted = false;
           break;
         case HEX2:
+          menustack[m].follow = entry;
+          MenuSystem_getUInt16( 0, 16, entry );
+          menuprinted = false;
+          break;
         case HEX4:
           menustack[m].follow = entry;
-          MenuSystem_getValue( 0, 16, entry );
+          MenuSystem_getUInt32( 0, 16, entry );
           menuprinted = false;
           break;
         default:
@@ -504,17 +749,20 @@ void MenuSystem_eval( char c )
   }
 }
 
+
 void MenuSystem_setup()
 {
   menustack[0].follow = 0;
   menustack[0].entries = menu_main;
 }
 
+
 void MenuSystem_loop()
 {
   MenuSystem_print();
   if( Serial.available() )
   {
+    Power_timer();
     MenuSystem_eval( toupper( Serial.read() ) );
   }
 }

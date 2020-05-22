@@ -1,6 +1,7 @@
 
 /*
- * 
+ * Power.ino
+ * =========
  * 
  * TODO: 
  * clock down
@@ -12,13 +13,13 @@
  * source. They are pins: 0,2,4,12-15,25-27,32-39.
  */
 
-#include <esp32-hal-cpu.h>
+#include <esp32-hal.h>
 
 unsigned long Power_off_millis = 0xFFFFFFFF;
 
 
 
-void Power_timer( unsigned short time )
+void Power_timer( uint16_t time )
 {
   Power_off_millis = millis() + 1000 * time;
   /* overflow check */
@@ -33,13 +34,13 @@ void Power_timer( unsigned short time )
 
 void Power_timer()
 {
-  Power_timer( bleKeyboard.isConnected() ? systemconfig.timer_bt : systemconfig.timer_nobt );
+  Power_timer( bleKeyboard.isConnected() ? sysconfig.timer_bt : sysconfig.timer_nobt );
 }
 
 
 void Power_setup()
 {
-  setCpuFrequencyMhz( systemconfig.cpu_freq ); //Set CPU clock to 80MHz fo example
+  setCpuFrequencyMhz( sysconfig.cpu_freq );
   Power_timer();
 }
 

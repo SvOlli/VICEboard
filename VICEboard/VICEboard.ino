@@ -1,10 +1,18 @@
 
+/*
+ * VICEboard.ino
+ * =============
+ *
+ * TODO:
+ */
+
 
 #include <BleKeyboard.h>
 
-#define ARRAY_ELEMENTS(array) (sizeof(array) / sizeof((array)[0]))
 #define DEBUG 1
-#define DEBOUNCE_THRESHOLD  4
+
+#define ARRAY_ELEMENTS(array) (sizeof(array) / sizeof((array)[0]))
+#define DEBOUNCE_THRESHOLD    (sysconfig.debounce_threshold)
 
 /*
  *              |         dc01         ||         dc00         |
@@ -14,20 +22,18 @@
  *                                   
  *   G     2    12 13 14 15 16 17 18 19 21 22 22 24 25 26 32 33
  */
-const unsigned char DC00_gpios[8] = { 21, 32, 27, 26, 25, 19, 22, 33 };
-const unsigned char DC01_gpios[8] = { 23, 18, 17, 12, 15, 14, 13, 16 };
-const unsigned char LED_gpios[2]  = { 0, 4 };
-const unsigned char RESTORE_GPIO  = 2;
-const int           RESTORE_id    = ARRAY_ELEMENTS(DC00_gpios) * ARRAY_ELEMENTS(DC01_gpios);
+const uint8_t DC00_gpios[8] = { 21, 32, 27, 26, 25, 19, 22, 33 };
+const uint8_t DC01_gpios[8] = { 23, 18, 17, 12, 15, 14, 13, 16 };
+const uint8_t LED_gpios[2]  = { 0, 4 };
+const uint8_t RESTORE_GPIO  = 2;
+const int     RESTORE_id    = ARRAY_ELEMENTS(DC00_gpios) * ARRAY_ELEMENTS(DC01_gpios);
 
 BleKeyboard bleKeyboard( "C64 Bluetooth Keyboard", "SvOlli", 100 );
 
 
 void setup()
 {
-  int i;
   Serial.begin( 115200 );
-  bleKeyboard.begin();
   setCpuFrequencyMhz( 240 ); // quick setup
 
   LED_setup();
@@ -39,17 +45,22 @@ void setup()
   }
   Serial.print( F("\n    **** VICEboard Bluetooth Keyboard ****\r\n\r\n ESP32 based system    ") );
   Serial.print( ESP.getFreeHeap() );
-  Serial.println( F(" heap bytes free\r\n\nREADY.\n") );
+  Serial.println( F(" heap bytes free\n") );
+  Serial.println( F("READY.") );
 
+  Serial.println( F("LIST EEPROM\n") );
   EEPROM_setup();
+  Keyboard_start_Bluetooth();
 
-  for ( i = 0; i < ARRAY_ELEMENTS(DC01_gpios); ++i )
+  for( int i = 0; i < ARRAY_ELEMENTS(DC01_gpios); ++i )
   {
     pinMode( DC00_gpios[i], INPUT_PULLUP );
     pinMode( DC01_gpios[i], INPUT_PULLUP );
   }
   pinMode( RESTORE_GPIO, INPUT_PULLUP );
 
+  Serial.println( F("READY.") );
+  Serial.println( F("RUN MENU") );
   MenuSystem_setup();
   Power_setup();
 }

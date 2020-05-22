@@ -2,7 +2,7 @@ VICEboard
 =========
 
 The VICEboard enables you to connect your C64 keyboard (or one from the VIC20)
-via bluetooth to a PC, Mac or Raspberry Pi. It uses the "positional" keyboard
+via Bluetooth to a PC, Mac or Raspberry Pi. It uses the "positional" keyboard
 mapping as defined by the [VICE emulator](https://vice-emu.sourceforge.io/). So
 you can use this keyboard to get an experience closer to the original machine.
 It is recommended to use it with the SDL version, since the VICEboard offers
